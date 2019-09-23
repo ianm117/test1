@@ -1,0 +1,164 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "apiProfile": "2019-07-01-profile",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus2"
+    },
+    "Subnets": {
+      "type": "array"
+    },
+    "principalId": {
+      "type": "string",
+      "metadata": {
+        "description": "The principal to assign the role to"
+      }
+    }
+  },
+  "variables": {},
+  "functions": [],
+  "resources": [
+    {
+      "name": "vNet1",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2019-04-01",
+      "location": "[parameters('location')]",
+      "tags": {},
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('Subnets')[1]]",
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "properties": {
+              "addressPrefix": "10.0.1.0/24",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'NSG1')]"
+              }
+            }
+          },
+          {
+            "name": "[parameters('Subnets')[0]]",
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "properties": {
+              "addressPrefix": "10.0.0.0/24",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'NSG2')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "NSG1",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2019-04-01",
+      "location": "eastus2",
+      "properties": {
+        "securityRules": [
+          {
+            "id": "nsg01",
+            "properties": {
+              "description": "nsg for vnet 1, subnet 2",
+              "protocol": "Tcp",
+              "sourcePortRange": "3389",
+              "sourceAddressPrefix": "10.0.0.0/16",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "3389",
+              "access": "Allow",
+              "direction": "Inbound",
+              "priority": 100
+            },
+            "name": "secRules1"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NSG2",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2019-04-01",
+      "location": "eastus2",
+      "properties": {
+        "securityRules": [
+          {
+            "id": "nsg02",
+            "properties": {
+              "description": "nsg for vnet 1, gateway subnet",
+              "protocol": "Tcp",
+              "sourcePortRange": "3389",
+              "access": "Allow",
+              "sourceAddressPrefix": "10.0.0.0/16",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "3389",
+              "direction": "Inbound",
+              "priority": 100
+            },
+            "name": "secRules2"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2018-11-01",
+      "name": "NIC1",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses/', 'PIP')]",
+        "[resourceId('Microsoft.Network/virtualNetworks/', 'vNet1')]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses','PIP')]"
+              },
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'vnet1', 'Subnet1')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2018-11-01",
+      "name": "PIP",
+      "location": "[parameters('location')]",
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic"
+      }
+    },
+    {
+      "name": "rt1",
+      "type": "Microsoft.Network/routeTables",
+      "apiVersion": "2019-04-01",
+      "location": "[parameters('location')]",
+      "properties": {}
+    },
+    {
+      "name": "[Guid(resourceGroup().id, parameters('principalId'), 'b24988ac-6180-42a0-ab88-20f7382dd24c')]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2018-09-01-preview",
+      "properties": {
+        "roleDefinitionId": "/providers/Microsoft.Authorization/roledefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c",
+        "principalId": "[parameters('principalId')]",
+        "principalType": "Group",
+        "scope": "[resourcegroup().id]"
+      }
+    }
+  ],
+  "outputs": {}
+}
